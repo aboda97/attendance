@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">attend_proj</string>
+    <string name="location_permission_reason">Location permission is required to check in to your workplace.</string>
+</resources>
