@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'dart:developer';
-
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -9,61 +9,73 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  bool _isLocationEnabled = false;
+  bool _isButtonEnabled = false;
+  late StreamSubscription<ServiceStatus> _locationServiceStatusStream;
 
   @override
   void initState() {
     super.initState();
-    _checkLocationPermission();
+    _checkInitialLocationStatus();
+    _listenToLocationServiceChanges();
   }
 
-  Future<void> _checkLocationPermission() async {
+  @override
+  void dispose() {
+    _locationServiceStatusStream.cancel();
+    super.dispose();
+  }
+
+  /// Check the initial status of location services
+  Future<void> _checkInitialLocationStatus() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      _showLocationAlert();
-      return;
-    }
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      LocationPermission requestedPermission =
-          await Geolocator.requestPermission();
-      if (requestedPermission == LocationPermission.denied ||
-          requestedPermission == LocationPermission.deniedForever) {
-        _showLocationAlert();
-        return;
-      }
-    }
-
     setState(() {
-      _isLocationEnabled = true;
+      _isButtonEnabled = serviceEnabled;
     });
   }
 
-  void _showLocationAlert() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Location Required"),
-        content: const Text("Please enable location services to check in."),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text("OK"),
-          ),
-        ],
-      ),
-    );
+  /// Listen to location service status changes
+  void _listenToLocationServiceChanges() {
+    _locationServiceStatusStream =
+        Geolocator.getServiceStatusStream().listen((ServiceStatus status) {
+      if (status == ServiceStatus.enabled) {
+        // Location services are turned on
+        setState(() {
+          _isButtonEnabled = true;
+        });
+      } else {
+        // Location services are turned off
+        setState(() {
+          _isButtonEnabled = false;
+        });
+      }
+    });
   }
 
+  /// Handle button press
   Future<void> _onCheckInPressed() async {
-    if (_isLocationEnabled) {
+    try {
       Position position = await Geolocator.getCurrentPosition();
-      // Handle the check-in logic here using the `position`.
+      DateTime now = DateTime.now();
+      log("Checked in at: ${now.toString()}");
       log("Checked in at: ${position.latitude}, ${position.longitude}");
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text("Thank You!"),
+          content: Text("Check-in successful. Have a great day!"),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: Text("OK"),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      print("Error: $e");
     }
   }
 
@@ -71,12 +83,12 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Work Check-In"),
+        title: Text("Work Check-In"),
       ),
       body: Center(
         child: ElevatedButton(
-          onPressed: _isLocationEnabled ? _onCheckInPressed : null,
-          child: const Text("Check In"),
+          onPressed: _isButtonEnabled ? _onCheckInPressed : null,
+          child: Text("Check In"),
         ),
       ),
     );
